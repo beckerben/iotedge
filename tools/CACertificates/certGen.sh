@@ -25,7 +25,7 @@ CERTIFICATE_DIR="${SCRIPT_DIR}"
 OPENSSL_CONFIG_FILE="${CERTIFICATE_DIR}/openssl_root_ca.cnf"
 # if you would like to override the default 30 day validity period, use
 # env variable DEFAULT_VALIDITY_DAYS and set the duration in units of days
-DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:=30}
+DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:=730}
 ROOT_CA_PREFIX="azure-iot-test-only.root.ca"
 ROOT_CA_PASSWORD=${ROOT_CA_PASSWORD:="1234"}
 INTERMEDIATE_CA_PREFIX="azure-iot-test-only.intermediate"
@@ -406,6 +406,26 @@ function generate_edge_device_identity_certificate()
 
 
 ###############################################################################
+# Generates a certificate for an Edge device, chained to the intermediate.
+###############################################################################
+function generate_edge_device_identity_certificate_with_pass()
+{
+    if [[ $# -ne 1 ]] || [[ -z ${1} ]]; then
+        echo "Usage error: Please provide a <subjectName>"
+        exit 1
+    fi
+    local common_name="${1}"
+    generate_certificate_common "usr_cert" \
+                                ${DEFAULT_VALIDITY_DAYS} \
+                                ${common_name} \
+                                "iot-edge-device-identity-${common_name}" \
+                                ${INTERMEDIATE_CA_PREFIX} \
+                                "changeme" \
+                                ${INTERMEDIATE_CA_PASSWORD}
+}
+
+
+###############################################################################
 # Generates a certificate for a server, chained to the device CA.
 ###############################################################################
 function generate_edge_server_certificate()
@@ -490,6 +510,8 @@ elif [ "${1}" == "create_edge_device_identity_certificate" ]; then
     generate_edge_device_identity_certificate "${2}"
 elif [ "${1}" == "create_edge_server_certificate" ]; then
     generate_edge_server_certificate "${2}"
+elif [ "${1}" == "generate_edge_device_identity_certificate_with_pass" ]; then
+    generate_edge_device_identity_certificate_with_pass "${2}"
 else
     echo "Usage: create_root_and_intermediate                   # Creates a new root and intermediate certificates"
     echo "       install_root_ca_from_files <path to certificate> <path to private key> <private key password>  # Sets up a CA file and creates an intermediate signing certificate. Both key and certificate are expected to be in PEM format"
