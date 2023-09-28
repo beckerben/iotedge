@@ -50,10 +50,12 @@ function usage() {
     echo ' -restartIntervalInMins                   Value for long haul specifying how often a random module will restart. If specified, then "desiredModulesToRestartCSV" must be specified as well.'
     echo ' -sendReportFrequency                     Value for long haul specifying how often TRC will send reports to LogAnalytics.'
     echo " -testMode                                Test mode for TestResultCoordinator to start up with correct settings. Value is either 'LongHaul' or 'Connectivity'."
+    echo " -topology                                Configuration telling the TRC which topology tests are running in."
     echo " -repoPath                                Path of the checked-out iotedge repository for getting the deployment file."
     echo " -clientModuleTransportType               Value for contrained long haul specifying transport type for all client modules."
     echo " -trackingId                              Tracking id used to tag test events. Needed if running nested tests and test events are sent to TRC from L4 node. Otherwise generated."
     echo ' -cleanAll                                Do docker prune for containers, logs and volumes.'
+    echo ' -packageType                             Package type to be used [deb, rpm]'
     exit 1;
 }
 
@@ -89,9 +91,9 @@ function get_artifact_file() {
 
     local filter
     case "$fileType" in
-        'aziot_edge' ) filter='aziot-edge_*.deb';;
-        'aziot_is' ) filter='aziot-identity-service_*.deb';;
-        'quickstart' ) filter='core-linux/IotEdgeQuickstart.linux*.tar.gz';;
+        'aziot_edge' ) filter="aziot-edge*.$PACKAGE_TYPE";;
+        'aziot_is' ) filter="aziot-identity-service*.$PACKAGE_TYPE";;
+        'quickstart' ) filter="core-linux/IotEdgeQuickstart.linux*.tar.gz";;
         *) print_error "Unknown file type: $fileType"; exit 1;;
     esac
 
@@ -211,6 +213,7 @@ function prepare_test_from_artifacts() {
     sed -i -e "s@<NetworkController.RunsCount0>@${NETWORK_CONTROLLER_FREQUENCIES[2]}@g" "$deployment_working_file"
 
     sed -i -e "s@<TestMode>@$TEST_MODE@g" "$deployment_working_file"
+    sed -i -e "s@<Topology>@$TOPOLOGY@g" "$deployment_working_file"
 
     sed -i -e "s@<LogRotationMaxFile>@$log_rotation_max_file@g" "$deployment_working_file"
     sed -i -e "s@<LogRotationMaxFileEdgeHub>@$log_rotation_max_file_edgehub@g" "$deployment_working_file"
@@ -285,10 +288,42 @@ function print_deployment_logs() {
     journalctl -u docker --since "$test_start_time" --no-pager || true
 
     print_highlighted_message '========== Logs from iotedge system =========='
-    iotedge system logs -- --since "$test_start_time" --no-pager || true
+    iotedge system logs -- --since "$test_start_time" --no-pager
 
     print_highlighted_message '========== Logs from edgeAgent =========='
     docker logs edgeAgent || true
+}
+
+
+function get_support_bundle_logs(){
+
+    print_highlighted_message "Getting Support Bundle Logs WITH TIMEOUT"
+    mkdir -p $working_folder/support
+    time=$(echo $test_start_time | sed 's/ /T/' | sed 's/$/Z/')
+
+    MAX_RETRIES=10
+    RETRY_COUNT=0
+    DID_SUCCEED=false
+
+    while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$DID_SUCCEED" = false ]; do
+        DID_TIMEOUT=false
+        timeout 180 iotedge support-bundle -o $working_folder/support/iotedge_support_bundle.zip --since "$time" || DID_TIMEOUT=true
+
+        if [ "$DID_TIMEOUT" = true ]; then
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+
+            if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                print_highlighted_message "Support Bundle timed out. Trying again."
+            else
+                print_highlighted_message "Support Bundle timed out after $MAX_RETRIES retries. Exiting."
+                exit 1
+            fi
+        else
+            DID_SUCCEED=true
+        fi
+    done
+
+    print_highlighted_message "Finished getting support Bundle Logs at $(date)"
 }
 
 function print_test_run_logs() {
@@ -296,80 +331,9 @@ function print_test_run_logs() {
 
     print_highlighted_message "test run exit code=$ret"
     print_highlighted_message 'Print logs'
+
     print_highlighted_message 'testResultCoordinator LOGS'
     docker logs testResultCoordinator || true
-
-    if (( ret < 1 )); then
-        return;
-    fi
-
-    print_deployment_logs
-
-    print_highlighted_message '========== Logs from edgeHub =========='
-    docker logs edgeHub || true
-
-    print_highlighted_message '========== Logs from loadGen1 =========='
-    docker logs loadGen1 || true
-
-    print_highlighted_message 'loadGen2 =========='
-    docker logs loadGen2 || true
-
-    print_highlighted_message 'relayer1 =========='
-    docker logs relayer1 || true
-
-    print_highlighted_message '========== Logs from relayer2 =========='
-    docker logs relayer2 || true
-
-    print_highlighted_message '========== Logs from directMethodSender1 =========='
-    docker logs directMethodSender1 || true
-
-    print_highlighted_message '========== Logs from directMethodReceiver1 =========='
-    docker logs directMethodReceiver1 || true
-
-    print_highlighted_message '========== Logs from directMethodSender2 =========='
-    docker logs directMethodSender2 || true
-
-    print_highlighted_message '========== Logs from directMethodReceiver2 =========='
-    docker logs directMethodReceiver2 || true
-
-    print_highlighted_message '========== Logs from directMethodSender3 =========='
-    docker logs directMethodSender3 || true
-
-    print_highlighted_message '========== Logs from twinTester1 =========='
-    docker logs twinTester1 || true
-
-    print_highlighted_message '========== Logs from twinTester2 =========='
-    docker logs twinTester2 || true
-
-    print_highlighted_message '========== Logs from twinTester3 =========='
-    docker logs twinTester3 || true
-
-    print_highlighted_message '========== Logs from twinTester4 =========='
-    docker logs twinTester4 || true
-
-    print_highlighted_message '========== Logs from deploymentTester1 =========='
-    docker logs deploymentTester1 || true
-
-    print_highlighted_message '========== Logs from deploymentTester2 =========='
-    docker logs deploymentTester2 || true
-
-    print_highlighted_message '========== Logs from cloudToDeviceMessageSender1 =========='
-    docker logs cloudToDeviceMessageSender1 || true
-
-    print_highlighted_message '========== Logs from cloudToDeviceMessageReceiver1 =========='
-    docker logs cloudToDeviceMessageReceiver1 || true
-
-    print_highlighted_message '========== Logs from cloudToDeviceMessageSender2 =========='
-    docker logs cloudToDeviceMessageSender2 || true
-
-    print_highlighted_message '========== Logs from cloudToDeviceMessageReceiver2 =========='
-    docker logs cloudToDeviceMessageReceiver2 || true
-
-    print_highlighted_message '========== Logs from genericMqttTester =========='
-    docker logs genericMqttTester || true
-
-    print_highlighted_message 'networkController =========='
-    docker logs networkController || true
 }
 
 function process_args() {
@@ -518,6 +482,12 @@ function process_args() {
         elif [ $saveNextArg -eq 47 ]; then
             TRACKING_ID="$arg"
             saveNextArg=0;
+        elif [ $saveNextArg -eq 48 ]; then
+            TOPOLOGY="$arg"
+            saveNextArg=0;
+        elif [ $saveNextArg -eq 49 ]; then
+            PACKAGE_TYPE="$arg"
+            saveNextArg=0
         else
             case "$arg" in
                 '-h' | '--help' ) usage;;
@@ -568,6 +538,8 @@ function process_args() {
                 '-repoPath' ) saveNextArg=45;;
                 '-clientModuleTransportType' ) saveNextArg=46;;
                 '-trackingId' ) saveNextArg=47;;
+                '-topology' ) saveNextArg=48;;
+                '-packageType' ) saveNextArg=49;;
                 '-waitForTestComplete' ) WAIT_FOR_TEST_COMPLETE=1;;
                 '-cleanAll' ) CLEAN_ALL=1;;
 
@@ -728,16 +700,18 @@ function run_connectivity_test() {
 
     print_highlighted_message "Deploy connectivity test succeeded."
 
-    # Delay for (buffer for module download + test start delay + test duration + verification delay + report generation)
+    # Delay for (buffer for module download + test start delay + test duration + verification delay + report generation + buffer time to check TRC report)
     local module_download_buffer=300
     local time_for_test_to_complete=$((module_download_buffer + \
                                     $(echo $TEST_START_DELAY | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }') + \
                                     $(echo $TEST_DURATION | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }') + \
                                     $(echo $VERIFICATION_DELAY | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }') + \
-                                    $(echo $TIME_FOR_REPORT_GENERATION | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')))
+                                    $(echo $TIME_FOR_REPORT_GENERATION | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }') + \
+                                    $(echo $CHECK_TRC_DELAY | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')))
     echo "test start delay=$TEST_START_DELAY"
     echo "test duration=$TEST_DURATION"
     echo "verification delay=$VERIFICATION_DELAY"
+    echo "check trc delay=$CHECK_TRC_DELAY"
     echo "time for report generation=$TIME_FOR_REPORT_GENERATION"
     echo "time for test to complete in seconds=$time_for_test_to_complete"
 
@@ -752,6 +726,7 @@ function run_connectivity_test() {
 
             if [ "$is_build_canceled" -eq '1' ]; then
                 print_highlighted_message "build is canceled."
+                get_support_bundle_logs
                 stop_aziot_edge || true
                 return 3
             fi
@@ -769,7 +744,8 @@ function run_connectivity_test() {
         else
             testExitCode=0
         fi
-
+        
+        get_support_bundle_logs
         print_test_run_logs $testExitCode
 
         # stop IoT Edge service after test complete to prevent sending metrics
@@ -864,6 +840,7 @@ function run_longhaul_test() {
             --device_ca_cert "$DEVICE_CA_CERT" \
             --device_ca_pk "$DEVICE_CA_PRIVATE_KEY" \
             --trusted_ca_certs "$TRUSTED_CA_CERTS" \
+            $PACKAGE_TYPE_ARG \
             $BYPASS_EDGE_INSTALLATION \
             --no-verify && ret=$? || ret=$?
     fi
@@ -889,11 +866,13 @@ function configure_longhaul_settings() {
     NETWORK_CONTROLLER_RUNPROFILE=${NETWORK_CONTROLLER_RUNPROFILE:-Online}
 
     if [ "$image_architecture_label" = 'amd64' ]; then
+        log_upload_enabled=true
         log_rotation_max_file="125"
         log_rotation_max_file_edgehub="400"
     fi
     if [ "$image_architecture_label" = 'arm32v7' ] ||
         [ "$image_architecture_label" = 'arm64v8' ]; then
+        log_upload_enabled=false
         log_rotation_max_file="7"
         log_rotation_max_file_edgehub="30"
 
@@ -923,9 +902,22 @@ function configure_longhaul_settings() {
 function configure_connectivity_settings() {
     NETWORK_CONTROLLER_RUNPROFILE=${NETWORK_CONTROLLER_RUNPROFILE:-Offline}
     TEST_DURATION="${TEST_DURATION:-01:00:00}"
+
     VERIFICATION_DELAY="${VERIFICATION_DELAY:-00:15:00}"
 
+    # Needs to be high due to 1ES conncectivity issues.
+    # This delay is used by the script to determine how
+    # long after test start to check the TRC report. This
+    # was added to avoid problem scenario where bootstrap
+    # EdgeAgent comes up, test starts, 1ES loses connectivity
+    # then test is started much later than expected. In this
+    # case, we need to wait more than we otherwise would to
+    # check TRC report.
+    CHECK_TRC_DELAY="${TEST_START_DELAY:-00:30:00}"
+
     TEST_INFO="$TEST_INFO,TestDuration=${TEST_DURATION}"
+
+    log_upload_enabled=false
 }
 
 LONGHAUL_TEST_NAME="LongHaul"
@@ -945,7 +937,7 @@ E2E_TEST_DIR="${E2E_TEST_DIR:-$(pwd)}"
 DEPLOYMENT_TEST_UPDATE_PERIOD="${DEPLOYMENT_TEST_UPDATE_PERIOD:-00:03:00}"
 EVENT_HUB_CONSUMER_GROUP_ID=${EVENT_HUB_CONSUMER_GROUP_ID:-\$Default}
 EDGE_RUNTIME_BUILD_NUMBER=${EDGE_RUNTIME_BUILD_NUMBER:-$ARTIFACT_IMAGE_BUILD_NUMBER}
-TEST_START_DELAY="${TEST_START_DELAY:-00:02:00}"
+TEST_START_DELAY="${TEST_START_DELAY:-00:10:00}"
 UPSTREAM_PROTOCOL="${UPSTREAM_PROTOCOL:-Amqp}"
 TIME_FOR_REPORT_GENERATION="${TIME_FOR_REPORT_GENERATION:-00:10:00}"
 TWIN_UPDATE_SIZE="${TWIN_UPDATE_SIZE:-1}"
@@ -956,9 +948,15 @@ NETWORK_CONTROLLER_FREQUENCIES=${NETWORK_CONTROLLER_FREQUENCIES:(null)}
 working_folder="$E2E_TEST_DIR/working"
 quickstart_working_folder="$working_folder/quickstart"
 
+if [ -z $PACKAGE_TYPE ]; then
+    echo 'Package type not specifed default to .deb'
+    PACKAGE_TYPE=deb
+fi
+
+PACKAGE_TYPE_ARG=--package-type="$PACKAGE_TYPE"
+
 if [ "$image_architecture_label" = 'amd64' ]; then
     optimize_for_performance=true
-    log_upload_enabled=true
 
     LOADGEN_MESSAGE_FREQUENCY="00:00:01"
     TWIN_UPDATE_FREQUENCY="00:00:15"
@@ -967,7 +965,6 @@ fi
 if [ "$image_architecture_label" = 'arm32v7' ] ||
     [ "$image_architecture_label" = 'arm64v8' ]; then
     optimize_for_performance=false
-    log_upload_enabled=false
 
     LOADGEN_MESSAGE_FREQUENCY="00:00:10"
     TWIN_UPDATE_FREQUENCY="00:01:00"

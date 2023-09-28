@@ -6,16 +6,16 @@ use std::convert::TryFrom;
 use aziot_identity_client_async::Client as IdentityClient;
 
 #[cfg(test)]
-use edgelet_test_utils::clients::IdentityClient;
+use test_common::client::IdentityClient;
 
 pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    client: std::sync::Arc<futures_util::lock::Mutex<IdentityClient>>,
+    client: std::sync::Arc<tokio::sync::Mutex<IdentityClient>>,
     pid: libc::pid_t,
     module_id: String,
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
 }
 
 #[async_trait::async_trait]
@@ -44,7 +44,7 @@ where
             .decode_utf8()
             .ok()?;
 
-        let pid = match extensions.get::<Option<libc::pid_t>>().cloned().flatten() {
+        let pid = match extensions.get::<Option<libc::pid_t>>().copied().flatten() {
             Some(pid) => pid,
             None => return None,
         };
@@ -136,8 +136,8 @@ mod tests {
     #[tokio::test]
     async fn update_delete() {
         // The Identity Client needs to be persisted across API calls.
-        let client = edgelet_test_utils::clients::IdentityClient::default();
-        let client = std::sync::Arc::new(futures_util::lock::Mutex::new(client));
+        let client = super::IdentityClient::default();
+        let client = std::sync::Arc::new(tokio::sync::Mutex::new(client));
 
         // Update Identity
         let mut route = test_route_ok!(TEST_PATH);

@@ -3,11 +3,11 @@ name = "edgelet-http-workload"
 version = "0.1.0"
 authors = ["Azure IoT Edge Devs"]
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
-base64 = "0.13"
+base64 = "0.21"
 chrono = "0.4"
 futures-util = "0.3"
 http = "0.2"
@@ -19,7 +19,7 @@ percent-encoding = "2"
 regex = "1"
 serde = "1"
 serde_json = "1"
-tokio = "1"
+tokio = { version = "1", features = ["parking_lot", "sync"] }
 url = "2"
 
 edgelet-core = { path = "../edgelet-core" }
@@ -34,14 +34,17 @@ aziot-key-openssl-engine = { git = "https://github.com/Azure/iot-identity-servic
 
 aziot-cert-client-async = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 aziot-cert-common-http = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
+aziot-certd-config = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 
 aziot-identity-client-async = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 aziot-identity-common = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 aziot-identity-common-http = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 
-http-common = { git = "https://github.com/Azure/iot-identity-service", branch = "main", features = ["tokio1"] }
+cert-renewal = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
+http-common = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }
 
 [dev-dependencies]
-nix = "0.22"
+nix = "0.26"
 
 edgelet-test-utils = { path = "../edgelet-test-utils" }
+test-common = { git = "https://github.com/Azure/iot-identity-service", branch = "main" }

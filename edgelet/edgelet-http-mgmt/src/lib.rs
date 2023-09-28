@@ -9,16 +9,16 @@ mod system_info;
 use aziot_identity_client_async::Client as IdentityClient;
 
 #[cfg(test)]
-use edgelet_test_utils::clients::IdentityClient;
+use test_common::client::IdentityClient;
 
 #[derive(Clone)]
 pub struct Service<M>
 where
     M: edgelet_core::ModuleRuntime,
 {
-    identity: std::sync::Arc<futures_util::lock::Mutex<IdentityClient>>,
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
-    reprovision: tokio::sync::mpsc::UnboundedSender<edgelet_core::ShutdownReason>,
+    identity: std::sync::Arc<tokio::sync::Mutex<IdentityClient>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
+    reprovision: tokio::sync::mpsc::UnboundedSender<edgelet_core::WatchdogAction>,
 }
 
 impl<M> Service<M>
@@ -29,17 +29,18 @@ where
     pub fn new(
         identity_socket: &url::Url,
         runtime: M,
-        reprovision: tokio::sync::mpsc::UnboundedSender<edgelet_core::ShutdownReason>,
+        reprovision: tokio::sync::mpsc::UnboundedSender<edgelet_core::WatchdogAction>,
     ) -> Result<Self, http_common::ConnectorError> {
         let connector = http_common::Connector::new(identity_socket)?;
 
         let identity = aziot_identity_client_async::Client::new(
             aziot_identity_common_http::ApiVersion::V2020_09_01,
             connector,
+            1,
         );
 
-        let identity = std::sync::Arc::new(futures_util::lock::Mutex::new(identity));
-        let runtime = std::sync::Arc::new(futures_util::lock::Mutex::new(runtime));
+        let identity = std::sync::Arc::new(tokio::sync::Mutex::new(identity));
+        let runtime = std::sync::Arc::new(tokio::sync::Mutex::new(runtime));
 
         Ok(Service {
             identity,
@@ -51,16 +52,16 @@ where
     // Test constructor used to create a test Management Service.
     #[cfg(test)]
     pub fn new(runtime: M) -> Self {
-        let identity = edgelet_test_utils::clients::IdentityClient::default();
-        let identity = std::sync::Arc::new(futures_util::lock::Mutex::new(identity));
+        let identity = IdentityClient::default();
+        let identity = std::sync::Arc::new(tokio::sync::Mutex::new(identity));
 
-        let runtime = std::sync::Arc::new(futures_util::lock::Mutex::new(runtime));
+        let runtime = std::sync::Arc::new(tokio::sync::Mutex::new(runtime));
 
         // We won't use the reprovision sender, but it must be created to construct the
         // Service struct. Note that we drop the reprovision receiver, which will cause
         // tests to panic if they use the reprovision sender.
         let (reprovision_tx, _) =
-            tokio::sync::mpsc::unbounded_channel::<edgelet_core::ShutdownReason>();
+            tokio::sync::mpsc::unbounded_channel::<edgelet_core::WatchdogAction>();
 
         Service {
             identity,
@@ -76,15 +77,15 @@ where
         runtime: M,
     ) -> (
         Self,
-        tokio::sync::mpsc::UnboundedReceiver<edgelet_core::ShutdownReason>,
+        tokio::sync::mpsc::UnboundedReceiver<edgelet_core::WatchdogAction>,
     ) {
-        let identity = edgelet_test_utils::clients::IdentityClient::default();
-        let identity = std::sync::Arc::new(futures_util::lock::Mutex::new(identity));
+        let identity = IdentityClient::default();
+        let identity = std::sync::Arc::new(tokio::sync::Mutex::new(identity));
 
-        let runtime = std::sync::Arc::new(futures_util::lock::Mutex::new(runtime));
+        let runtime = std::sync::Arc::new(tokio::sync::Mutex::new(runtime));
 
         let (reprovision_tx, reprovision_rx) =
-            tokio::sync::mpsc::unbounded_channel::<edgelet_core::ShutdownReason>();
+            tokio::sync::mpsc::unbounded_channel::<edgelet_core::WatchdogAction>();
 
         (
             Service {

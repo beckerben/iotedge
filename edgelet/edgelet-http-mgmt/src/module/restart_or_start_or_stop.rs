@@ -4,7 +4,7 @@ pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
     module: String,
     action: Action,
 }
@@ -82,7 +82,7 @@ where
             Action::Start => runtime.start(&self.module).await,
             Action::Stop => runtime.stop(&self.module, None).await,
         }
-        .map_err(|err| edgelet_http::error::server_error(err.to_string()))?;
+        .map_err(|err| edgelet_http::error::runtime_error(&*runtime, &err))?;
 
         Ok(http_common::server::response::no_content())
     }

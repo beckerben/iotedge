@@ -42,7 +42,12 @@ To reconfigure IoT Edge, run:
 
         imported_master_encryption_key: None,
 
+        #[cfg(contenttrust)]
         manifest_trust_bundle_cert: None,
+
+        additional_info: None,
+
+        iotedge_max_requests: Default::default(),
 
         aziot: common_config::super_config::Config {
             hostname: None,
@@ -65,6 +70,10 @@ To reconfigure IoT Edge, run:
 
             cloud_retries: aziot_identityd_config::Settings::default_cloud_retries(),
 
+            aziot_max_requests: Default::default(),
+
+            prefer_module_identity_cache: Default::default(),
+
             aziot_keys: Default::default(),
 
             preloaded_keys: Default::default(),
@@ -72,6 +81,8 @@ To reconfigure IoT Edge, run:
             cert_issuance: Default::default(),
 
             preloaded_certs: Default::default(),
+
+            tpm: Default::default(),
 
             endpoints: Default::default(),
         },
@@ -86,15 +97,17 @@ To reconfigure IoT Edge, run:
         edge_ca: None,
 
         moby_runtime: Default::default(),
+
+        image_garbage_collection: Default::default(),
     };
-    let config = toml::to_vec(&config)
+    let config = toml::to_string(&config)
         .map_err(|err| format!("could not serialize system config: {}", err))?;
 
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::current())
         .map_err(|err| format!("could not query current user information: {}", err))?
         .ok_or("could not query current user information")?;
 
-    common_config::write_file(&out_config_file, &config, &user, 0o0600)
+    common_config::write_file(out_config_file, config.as_bytes(), &user, 0o0600)
         .map_err(|err| format!("{:?}", err))?;
 
     println!("Azure IoT Edge has been configured successfully!");

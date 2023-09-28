@@ -9,11 +9,11 @@ jobs:
     pool:
       name: $(pool.linux.name)
       demands:
-        - ImageOverride -equals agent-aziotedge-ubuntu-18.04-docker
+        - ImageOverride -equals agent-aziotedge-ubuntu-22.04-msmoby
     steps:
       - template: nested-get-secrets.yaml
       - script: scripts/linux/nestedAgentLock.sh -a "$(agent.group)" -b "$(Build.BuildId)" -n ${{ parameters['testRunnerCount'] }} -u ${{ parameters['upstream.protocol'] }}
         env:
-          PAT: "$(edgebuild-1-PAT)"
+          PAT: "$(IotEdge1-PAT-msazure)"
         displayName: Lock agents for nested topology
         name: lock_test_agent

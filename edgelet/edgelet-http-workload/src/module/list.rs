@@ -4,7 +4,7 @@ pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
 }
 
 const PATH: &str = "/modules";
@@ -46,7 +46,7 @@ where
         let modules = runtime
             .list_with_details()
             .await
-            .map_err(|err| edgelet_http::error::server_error(err.to_string()))?;
+            .map_err(edgelet_http::error::server_error)?;
 
         let res: edgelet_http::ListModulesResponse = modules.into();
         let res = http_common::server::response::json(hyper::StatusCode::OK, &res);

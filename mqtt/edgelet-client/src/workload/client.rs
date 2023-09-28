@@ -74,7 +74,7 @@ impl WorkloadClient {
         let uri =
             make_hyper_uri(&self.scheme, &path).map_err(|e| ApiError::ConstructRequestUrl(e))?;
 
-        let req = SignRequest::new(base64::encode(data.to_string()));
+        let req = SignRequest::new(base64::encode(data));
         self.post(uri, req, StatusCode::OK).await
     }
 
@@ -149,6 +149,7 @@ pub enum WorkloadError {
 }
 
 #[cfg(test)]
+#[allow(clippy::semicolon_if_nothing_returned)]
 mod tests {
     use chrono::{Duration, Utc};
     use http::StatusCode;
@@ -164,7 +165,7 @@ mod tests {
         let scheme = Scheme::Unix("unix:///var/iotedge/aziot-edged.workload.sock".into());
         let path = "/modules/$edgeHub/genid/12345678/certificate/server?api-version=2019-01-30";
 
-        let uri = make_hyper_uri(&scheme, &path).unwrap();
+        let uri = make_hyper_uri(&scheme, path).unwrap();
         assert!(uri.to_string().ends_with(path));
     }
 

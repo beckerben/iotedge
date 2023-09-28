@@ -9,6 +9,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Certs
     public class CaCertificates : IdCertificates
     {
         public string TrustedCertificatesPath { get; }
+        public Option<Dictionary<string, string>> ContentTrustInputs { get; }
 
         public IEnumerable<X509Certificate2> TrustedCertificates =>
             new[]

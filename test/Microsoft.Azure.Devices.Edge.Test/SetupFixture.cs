@@ -3,6 +3,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
 {
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Net;
     using System.Text;
     using System.Text.RegularExpressions;
@@ -11,6 +12,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
     using Microsoft.Azure.Devices.Edge.Test.Common;
     using Microsoft.Azure.Devices.Edge.Test.Common.Certs;
     using Microsoft.Azure.Devices.Edge.Test.Helpers;
+    using Microsoft.Azure.Devices.Edge.Util;
     using NUnit.Framework;
     using Serilog;
     using Serilog.Events;
@@ -25,7 +27,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
             ("/etc/aziot/keyd/config.toml", "aziotks"),
             ("/etc/aziot/certd/config.toml", "aziotcs"),
             ("/etc/aziot/identityd/config.toml", "aziotid"),
-            ("/etc/aziot/tpmd/config.toml", "aziotts"),
+            ("/etc/aziot/tpmd/config.toml", "aziottpm"),
             ("/etc/aziot/edged/config.toml", "iotedge")
         };
 
@@ -113,7 +115,8 @@ namespace Microsoft.Azure.Devices.Edge.Test
                                 edgeAgent = Regex.Replace(edgeAgent, @"\$upstream", parentHostname);
                             });
 
-                            config.SetEdgeAgentImage(edgeAgent, Context.Current.Registries);
+                            // The first element corresponds to the registry credentials for edge agent image
+                            config.SetEdgeAgentImage(edgeAgent, Context.Current.Registries.Take(1));
 
                             Context.Current.EdgeProxy.ForEach(proxy =>
                             {

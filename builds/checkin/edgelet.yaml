@@ -2,7 +2,7 @@ trigger: none
 pr:
   branches:
     include:
-      - master
+      - main
       - release/*
 
 jobs:
@@ -11,10 +11,12 @@ jobs:
 ################################################################################
     displayName: Check pipeline preconditions (changes ARE in builds or edgelet)
     pool:
-      vmImage: "ubuntu-18.04"
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
     steps:
       - bash: |
-          git log -m -1 --name-only --first-parent --pretty="" | egrep -i '^(builds|edgelet)'
+          git log -m -1 --name-only --first-parent --pretty="" | egrep -i '^(rust-toolchain\.toml|builds|edgelet)'
           if [[ $? == 0 ]]; then
             echo "Detected changes inside builds or edgelet folders"
             echo "##vso[task.setvariable variable=RUN_PIPELINE;isOutput=true]TRUE"
@@ -29,14 +31,14 @@ jobs:
     dependsOn: check_run_pipeline
     condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
     pool:
-      vmImage: "ubuntu-18.04"
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
     steps:
       - script: echo "##vso[task.setvariable variable=NO_VALGRIND;]true"
         displayName: Set env variables
       - bash: scripts/linux/generic-rust/install.sh --project-root "edgelet"
         displayName: Install Rust
-      - bash: edgelet/build/linux/check-submodules.sh
-        displayName: Check submodules
       - bash: scripts/linux/generic-rust/build.sh --project-root "edgelet" --packages "iotedge;aziot-edged" --reduced-linker
         displayName: Build
       - bash: edgelet/build/linux/test.sh
@@ -49,7 +51,9 @@ jobs:
     dependsOn: check_run_pipeline
     condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
     pool:
-      vmImage: "ubuntu-18.04"
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
     variables:
       IOTEDGE_HOMEDIR: /tmp
     steps:
@@ -62,8 +66,8 @@ jobs:
         displayName: Set Version
       - bash: scripts/linux/generic-rust/install.sh --project-root "edgelet"
         displayName: Install Rust
-      - script: "cargo install --git https://github.com/arsing/cross.git --branch set-path"
-        displayName: "Install cross (fork with docker fix)"
+      - script: "cargo install cross --version ^0.2"
+        displayName: "Install cross"
       - script: "cross build --target armv7-unknown-linux-gnueabihf"
         displayName: armv7-unknown-linux-gnueabihf build
         workingDirectory: $(Build.SourcesDirectory)/edgelet
@@ -78,7 +82,9 @@ jobs:
     dependsOn: check_run_pipeline
     condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
     pool:
-      vmImage: "ubuntu-18.04"
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
     variables:
       IOTEDGE_HOMEDIR: /tmp
     steps:
@@ -91,8 +97,8 @@ jobs:
         displayName: Set Version
       - bash: scripts/linux/generic-rust/install.sh --project-root "edgelet"
         displayName: Install Rust
-      - script: "cargo install --git https://github.com/arsing/cross.git --branch set-path"
-        displayName: "Install cross (fork with docker fix)"
+      - script: "cargo install cross --version ^0.2"
+        displayName: "Install cross"
       - script: "cross build --target aarch64-unknown-linux-gnu"
         displayName: aarch64-unknown-linux-gnu build
         workingDirectory: $(Build.SourcesDirectory)/edgelet
@@ -107,7 +113,9 @@ jobs:
     dependsOn: check_run_pipeline
     condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
     pool:
-      vmImage: "ubuntu-18.04"
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
     steps:
       - script: echo "##vso[task.setvariable variable=NO_VALGRIND;]true"
         displayName: Set env variables
@@ -118,71 +126,43 @@ jobs:
       - bash: edgelet/build/linux/clippy.sh
         displayName: Clippy
 
-# The CI VMs encounter
-#
-# >ld returned 1 exit status
-#
-# ... when running this job for no obvious reason.
-#
-# ################################################################################
-#   - job: code_coverage
-# ################################################################################
-#     displayName: Code Coverage
-#     dependsOn: check_run_pipeline
-#     condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
-#     variables:
-#       coverage.excludes: "docker-rs*"
-#       coverage.goal: 68
-#       rust.toolchain: nightly-2020-04-10
-#     pool:
-#       vmImage: "ubuntu-18.04"
-#     steps:
-#       - script: |
-#           echo "##vso[task.setvariable variable=NO_VALGRIND;]true"
-#           echo "##vso[task.setvariable variable=CARGO_INCREMENTAL;]0"
-#           echo "##vso[task.setvariable variable=RUSTFLAGS;]-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
-#           echo "##vso[task.setvariable variable=IOTEDGE_HOMEDIR;]/tmp"
-#           echo "##vso[task.setvariable variable=CARGO;]${CARGO_HOME:-"$HOME/.cargo"}/bin/cargo"
-#         displayName: Set env variables
-#       - script: |
-#           echo "$RUST_TOOLCHAIN" > rust-toolchain
-#         displayName: Override Rust toolchain
-#         workingDirectory: edgelet
-#         env:
-#           RUST_TOOLCHAIN: $(rust.toolchain)
-#       - script: edgelet/build/linux/install.sh
-#         displayName: Install Rust
-#       - script: |
-#           curl -L https://github.com/mozilla/grcov/releases/download/v0.5.1/grcov-linux-x86_64.tar.bz2 | tar jxf -
-#           curl -L https://raw.github.com/eriwen/lcov-to-cobertura-xml/8c55cd11f80a21e7e46f20f8c81fcde0bf11f5e5/lcov_cobertura/lcov_cobertura.py -o lcov_cobertura.py
-#         workingDirectory: edgelet
-#         displayName: Install code coverage tools
-#       - script: $CARGO build --verbose
-#         displayName: Build
-#         workingDirectory: edgelet
-#       - script: $CARGO test --verbose
-#         displayName: Test
-#         workingDirectory: edgelet
-#       - script: find ./target -type f ! -name '*.gc*' -delete
-#         displayName: Cleanup build and test artifacts
-#         workingDirectory: edgelet
-#       - script: |
-#           zip -1 target/ccov.zip `find ./target \( -name "*.gc*" \) -print`
-#           ./grcov target/ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" --ignore-dir "*docker-rs*" > target/lcov.info
-#           python lcov_cobertura.py target/lcov.info --output ./coverage.xml --demangle --base-dir $(Build.SourcesDirectory)/edgelet -e "${COVERAGE_EXCLUDES}"
-#         displayName: Assemble code coverage results
-#         workingDirectory: edgelet
-#         env:
-#           COVERAGE_EXCLUDES: $(coverage.excludes)
-#       - task: PublishCodeCoverageResults@1
-#         displayName: Publish code coverage results
-#         inputs:
-#           codeCoverageTool: cobertura
-#           summaryFileLocation: "edgelet/coverage.xml"
-#       - task: mspremier.BuildQualityChecks.QualityChecks-task.BuildQualityChecks@5
-#         displayName: "Check build quality"
-#         inputs:
-#           checkCoverage: true
-#           coverageFailOption: fixed
-#           coverageType: lines
-#           coverageThreshold: $(coverage.goal)
+################################################################################
+  - job: code_coverage
+################################################################################
+    displayName: Code Coverage
+    dependsOn: check_run_pipeline
+    condition: eq(dependencies.check_run_pipeline.outputs['check_files.RUN_PIPELINE'], 'true')
+    variables:
+      coverage.goal: 30
+    pool:
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
+    steps:
+      - script: |
+          echo "##vso[task.setvariable variable=IOTEDGE_HOMEDIR;]/tmp"
+          echo "##vso[task.setvariable variable=CARGO;]${CARGO_HOME:-"$HOME/.cargo"}/bin/cargo"
+        displayName: Set env variables
+        workingDirectory: edgelet
+      - script: scripts/linux/generic-rust/install.sh --project-root "edgelet"
+        displayName: Install Rust
+      - script: |
+          $CARGO install --locked cargo-tarpaulin
+        workingDirectory: edgelet
+        displayName: Install Cargo Tarpaulin
+      - script: |
+          $CARGO tarpaulin --out Xml --output-dir .
+        displayName: Test
+        workingDirectory: edgelet
+      - task: PublishCodeCoverageResults@1
+        displayName: Publish code coverage results
+        inputs:
+          codeCoverageTool: cobertura
+          summaryFileLocation: "edgelet/cobertura.xml"
+      - task: mspremier.BuildQualityChecks.QualityChecks-task.BuildQualityChecks@5
+        displayName: "Check build quality"
+        inputs:
+          checkCoverage: true
+          coverageFailOption: fixed
+          coverageType: lines
+          coverageThreshold: $(coverage.goal)

@@ -46,6 +46,7 @@ impl Network {
         &self.name
     }
 
+    #[must_use]
     pub fn with_name(mut self, name: String) -> Self {
         self.name = name;
         self
@@ -55,6 +56,7 @@ impl Network {
         self.ipv6
     }
 
+    #[must_use]
     pub fn with_ipv6(mut self, ipv6: Option<bool>) -> Self {
         self.ipv6 = ipv6;
         self
@@ -64,13 +66,14 @@ impl Network {
         self.ipam.as_ref()
     }
 
+    #[must_use]
     pub fn with_ipam(mut self, ipam: Ipam) -> Self {
         self.ipam = Some(ipam);
         self
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Ipam {
     #[serde(rename = "config", skip_serializing_if = "Option::is_none")]
     pub config: Option<Vec<IpamConfig>>,
@@ -81,13 +84,14 @@ impl Ipam {
         self.config.as_deref()
     }
 
+    #[must_use]
     pub fn with_config(mut self, config: Vec<IpamConfig>) -> Self {
         self.config = Some(config);
         self
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct IpamConfig {
     #[serde(rename = "gateway", skip_serializing_if = "Option::is_none")]
     pub gateway: Option<String>,
@@ -104,6 +108,7 @@ impl IpamConfig {
         self.gateway.as_deref()
     }
 
+    #[must_use]
     pub fn with_gateway(mut self, gateway: String) -> Self {
         self.gateway = Some(gateway);
         self
@@ -113,6 +118,7 @@ impl IpamConfig {
         self.subnet.as_deref()
     }
 
+    #[must_use]
     pub fn with_subnet(mut self, subnet: String) -> Self {
         self.subnet = Some(subnet);
         self
@@ -122,6 +128,7 @@ impl IpamConfig {
         self.ip_range.as_deref()
     }
 
+    #[must_use]
     pub fn with_ip_range(mut self, ip_range: String) -> Self {
         self.ip_range = Some(ip_range);
         self
@@ -169,7 +176,7 @@ mod tests {
 
     #[test]
     fn moby_network_name() {
-        let moby_network_with_no_name = MobyNetwork::Name("".to_string());
+        let moby_network_with_no_name = MobyNetwork::Name(String::new());
 
         let moby_1 = "name-1";
         let moby_network_with_name = MobyNetwork::Name(moby_1.to_string());

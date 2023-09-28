@@ -50,7 +50,7 @@ pub(crate) fn get_host_container_upstream_tests() -> Vec<Box<dyn Checker>> {
     ]
 }
 
-#[derive(serde_derive::Serialize)]
+#[derive(serde::Serialize)]
 pub(crate) struct ContainerConnectUpstream {
     upstream_port: UpstreamProtocolPort,
     upstream_hostname: Option<String>,
@@ -143,15 +143,15 @@ impl ContainerConnectUpstream {
         let port = self.upstream_port.as_port().to_string();
 
         if self.use_container_runtime_network {
-            args.extend(&["--network", network_name]);
+            args.extend(["--network", network_name]);
         }
 
         if check.parent_hostname.is_some() {
-            args.extend(&["-v", &map_volume]);
+            args.extend(["-v", &map_volume]);
         }
 
         self.diagnostics_image_name = Some(check.diagnostics_image_name.clone());
-        args.extend(&[
+        args.extend([
             &diagnostics_image_name,
             "dotnet",
             "IotedgeDiagnosticsDotnet.dll",
@@ -163,14 +163,14 @@ impl ContainerConnectUpstream {
         ]);
 
         if check.parent_hostname.is_some() {
-            args.extend(&["--isNested", "true"]);
-            args.extend(&["--workload_uri", &workload_uri]);
+            args.extend(["--isNested", "true"]);
+            args.extend(["--workload_uri", &workload_uri]);
         }
 
         if &port == "443" {
             self.proxy = check.proxy_uri.clone();
             if let Some(proxy) = &check.proxy_uri {
-                args.extend(&["--proxy", proxy.as_str()]);
+                args.extend(["--proxy", proxy.as_str()]);
             }
         }
 
@@ -179,18 +179,16 @@ impl ContainerConnectUpstream {
         }
 
         if let Err((_, err)) = super::docker(docker_host_arg, args).await {
-            let err = err
-                .context(format!(
-                    "Container on the {} network could not connect to {}:{}",
-                    if self.use_container_runtime_network {
-                        network_name
-                    } else {
-                        "default"
-                    },
-                    upstream_hostname,
-                    port,
-                ))
-                .into();
+            let err = err.context(format!(
+                "Container on the {} network could not connect to {}:{}",
+                if self.use_container_runtime_network {
+                    network_name
+                } else {
+                    "default"
+                },
+                upstream_hostname,
+                port,
+            ));
             return CheckResult::Failed(err);
         }
 

@@ -5,6 +5,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
     using System.Collections.Generic;
     using System.Net.Http;
     using System.Threading.Tasks;
+    using Microsoft.Azure.Devices.Edge.Test.Common;
     using Microsoft.Azure.Devices.Edge.Test.Common.Config;
     using Newtonsoft.Json.Linq;
     using NUnit.Framework;
@@ -44,7 +45,12 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
                 });
         }
 
-        public static Action<EdgeConfigBuilder> BuildAddTestResultCoordinatorConfig(string trackingId, string trcImage, string expectedSourceModuleName, string actualSourceModuleName)
+        public static Action<EdgeConfigBuilder> BuildAddTestResultCoordinatorConfig(
+            string trackingId,
+            string trcImage,
+            string expectedSourceModuleName,
+            string actualSourceModuleName,
+            bool mqttBrokerEnabled)
         {
             return new Action<EdgeConfigBuilder>(
                 builder =>
@@ -61,7 +67,8 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
                            ("testStartDelay", "00:00:00"),
                            ("verificationDelay", "00:00:00"),
                            ("NetworkControllerRunProfile", "Online"),
-                           ("TEST_INFO", "key=unnecessary")
+                           ("TEST_INFO", "key=unnecessary"),
+                           ("mqttBrokerEnabled", mqttBrokerEnabled.ToString())
                        })
                        .WithSettings(new[] { ("createOptions", "{\"HostConfig\": {\"PortBindings\": {\"5001/tcp\": [{\"HostPort\": \"5001\"}]}}}") })
 
@@ -89,7 +96,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
                 });
         }
 
-        public static async Task ValidateResultsAsync()
+        public static async Task<bool> IsResultValidAsync()
         {
             HttpClient client = new HttpClient();
             HttpResponseMessage response = await client.GetAsync(TestResultCoordinatorUrl);
@@ -109,7 +116,40 @@ namespace Microsoft.Azure.Devices.Edge.Test.Helpers
                 Log.Information("Test Result Coordinator response: {Response}", jsonstring);
             }
 
-            Assert.IsTrue(isPassed);
+            return isPassed;
+        }
+
+        public static async Task<bool> IsCountingReportResultValidAsync(int numResultsExpected)
+        {
+            HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.GetAsync(TestResultCoordinatorUrl);
+            var jsonstring = await response.Content.ReadAsStringAsync();
+            bool isTestReportValid;
+            int expected;
+            int matched;
+            try
+            {
+                isTestReportValid = (bool)JArray.Parse(jsonstring)[0]["IsPassed"];
+
+                expected = (int)JArray.Parse(jsonstring)[0]["TotalExpectCount"];
+                matched = (int)JArray.Parse(jsonstring)[0]["TotalMatchCount"];
+
+                if (expected != numResultsExpected || matched != numResultsExpected)
+                {
+                    isTestReportValid = false;
+                }
+            }
+            catch
+            {
+                isTestReportValid = false;
+            }
+
+            if (!isTestReportValid)
+            {
+                Log.Verbose("Test Result Coordinator response: {Response}", jsonstring);
+            }
+
+            return isTestReportValid;
         }
     }
 }

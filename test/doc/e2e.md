@@ -12,9 +12,9 @@ There are three directories under `test/`:
 
 ### Software Requirements
 
-End-to-end tests are written in .NET Core and run with the `dotnet test` command, so you need to [install .NET Core SDK](https://docs.microsoft.com/en-us/dotnet/core/install/sdk).
+End-to-end tests are written in .NET Core and run with the `dotnet test` command, so you need to [install .NET Core SDK](https://docs.microsoft.com/dotnet/core/install/sdk).
 
-The tests install the IoT Edge runtime _on the local host_, so your machine must support IoT Edge. Check out our installation docs ([Linux](https://docs.microsoft.com/en-us/azure/iot-edge/how-to-install-iot-edge-windows), [Windows](https://docs.microsoft.com/en-us/azure/iot-edge/how-to-install-iot-edge-linux)) to see what steps the test fixtures take to install IoT Edge, and to ensure your machine meets any prerequisites. **Note that on Linux, the fixtures do not install Moby engine**; you need to install Moby engine (or Docker) before you run the tests.
+The tests install the IoT Edge runtime _on the local host_, so your machine must support IoT Edge. Check out our installation docs ([Linux](https://docs.microsoft.com/azure/iot-edge/how-to-install-iot-edge), [Windows](https://docs.microsoft.com/azure/iot-edge/how-to-install-iot-edge-on-windows)) to see what steps the test fixtures take to install IoT Edge, and to ensure your machine meets any prerequisites. **Note that on Linux, the fixtures do not install Moby engine**; you need to install Moby engine (or Docker) before you run the tests.
 
 ### Test parameters
 
@@ -23,14 +23,17 @@ The end-to-end tests take several parameters, which they expect to find in a fil
 | Name | Required | Description |
 |------|----------|-------------|
 | `caCertScriptPath` | * | Path to the folder containing `certGen.sh` (Linux) or `ca-certs.ps1` (Windows). Required when running the test 'TransparentGateway', ignored otherwise. |
-| `dpsIdScope` | * | The [ID Scope](https://docs.microsoft.com/en-us/azure/iot-dps/concepts-device#id-scope) assigned to a Device Provisioning Service. Required when running any DPS tests, ignored otherwise. |
+| `dpsIdScope` | * | The [ID Scope](https://docs.microsoft.com/azure/iot-dps/concepts-device#id-scope) assigned to a Device Provisioning Service. Required when running any DPS tests, ignored otherwise. |
 | `edgeAgentImage` || Docker image to pull/use for Edge Agent. If not given, the default value `mcr.microsoft.com/azureiotedge-agent:1.0` is used. This setting only applies to any configurations deployed by the tests. Note also that the default value is ALWAYS used in config.yaml to start IoT Edge; this setting only applies to any configurations deployed by the tests. |
 | `edgeHubImage` || Docker image to pull/use for Edge Hub. If not given, `mcr.microsoft.com/azureiotedge-hub:1.0` is used. |
+| `edgeHubSchemaVersion` || The schema version used for EdgeHub. |
 | `installerPath` || Path to the Windows installer script `IotEdgeSecurityDaemon.ps1`. This parameter is ignored on Linux, and optional on Windows. If not given on Windows, the default script will be downloaded from https://aka.ms/iotedge-win to a temporary location. |
+| `iotHubResourceId` || Full resource ID (`/resource/subscriptions/<Azure subscription>/resourceGroups/<resource group name>/providers/Microsoft.Devices/IotHubs/<IoT hub name>`) of the IoT hub that will receive metrics messages. Required when running the test 'MetricsCollector', ignored otherwise. |
 | `loadGenImage` | * | LoadGen image to be used. Required when running PriorityQueue tests, ignored otherwise.|
 | `logFile` || Path to which all test output will be written, including verbose output. This setting allows the user to capture all the details of a test pass while keeping the shell window output free of visual clutter. Note that daemon logs and module logs are always written to the same directory as the test binaries (e.g., `test/Microsoft.Azure.Devices.Edge.Test/bin/Debug/netcoreapp2.1/*.log`), independent of this parameter. |
 | `methodReceiverImage` | * | Docker image to pull/use for the 'DirectMethodReceiver' module. Required when running the test 'ModuleToModuleDirectMethod', ignored otherwise. |
 | `methodSenderImage` | * | Docker image to pull/use for the 'DirectMethodSender' module. Required when running the test 'ModuleToModuleDirectMethod', ignored otherwise. |
+| `metricsCollectorImage` | * | Docker image to pull/use for the Metrics Collector module. Required when running the test 'MetricsCollector', ignored otherwise.|
 | `networkControllerImage` | * | NetworkControllerImage image to be used. Required when running PriorityQueue tests, ignored otherwise.|
 | `optimizeForPerformance` || Boolean value passed to Edge Hub. Usually set to 'false' when running on more constrained platforms like Raspberry Pi. If not given, it defaults to 'true'. |
 | `packagePath` || Path to the folder containing IoT Edge installation packages (e.g., .deb files on Linux, .cab file on Windows). If not given, the latest stable release packages are downloaded and used. |
@@ -47,7 +50,6 @@ The end-to-end tests take several parameters, which they expect to find in a fil
 | `tempSensorImage` || Docker image to pull/use for the temperature sensor module (see the test 'TempSensor'). If not given, `mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0` is used.|
 | `numberLoggerImage` || Docker image to pull/use for the Edge agent direct method tests. Used to generate predictable logs. |
 | `testResultCoordinatorImage` | * | TestResultCoordinator image to be used. Required when running PriorityQueue or GenericMqtt tests, ignored otherwise.|
-| `genericMqttTesterImage` | * | GenericMqttTester image to be used. Required when running GenericMqtt tests, ignored otherwise.
 | `testTimeoutMinutes` || The maximum amount of time, in minutes, a single test should take. If this time is exceeded, the associated test will fail with a timeout error. If not given, the default value is `5`. |
 | `verbose` || Boolean value indicating whether to output more verbose logging information to standard output during a test run. If not given, the default is `false`. |
 
@@ -57,7 +59,7 @@ The tests also expect to find several _secret_ parameters. While these can techn
 
 | Name | Required | Description |
 |------|----------|-------------|
-| `[E2E_]DPS_GROUP_KEY` | * | The symmetric key of the DPS [enrollment group](https://docs.microsoft.com/en-us/azure/iot-dps/concepts-service#enrollment-group) to use. Required when running any DPS tests, ignored otherwise. |
+| `[E2E_]DPS_GROUP_KEY` | * | The symmetric key of the DPS [enrollment group](https://docs.microsoft.com/azure/iot-dps/concepts-service#enrollment-group) to use. Required when running any DPS tests, ignored otherwise. |
 | `[E2E_]IOT_HUB_CONNECTION_STRING` | ✔ | Hub-scoped IoT Hub connection string that can be used to get/add/remove devices, deploy edge configurations, and get/update module twins. |
 | `[E2E_]EVENT_HUB_ENDPOINT` | ✔ | Connection string used to connect to the Event Hub-compatible endpoint of your IoT Hub, to listen for D2C events sent by devices or modules. |
 | `[E2E_]REGISTRIES__{n}__PASSWORD` || Password associated with a container registry entry in the `registries` array of `context.json`. `{n}` is the number corresponding to the (zero-based) array entry. For example, if you specified a single container registry in the `registries` array, the corresponding parameter would be `[E2E_]REGISTRIES__0__PASSWORD`. |
@@ -83,7 +85,7 @@ sudo --preserve-env dotnet test ./test/Microsoft.Azure.Devices.Edge.Test
 ```
 
 To learn about other ways to run the tests (e.g., to run only certain tests), see 
-[Running selective unit tests](https://docs.microsoft.com/en-us/dotnet/core/testing/selective-unit-tests#nunit)
+[Running selective unit tests](https://docs.microsoft.com/dotnet/core/testing/selective-unit-tests?pivots=nunit)
 
 ### Troubleshooting
 

@@ -14,6 +14,7 @@ pub(crate) fn identity_client(
     let identity_client = aziot_identity_client_async::Client::new(
         aziot_identity_common_http::ApiVersion::V2020_09_01,
         identity_connector,
+        1,
     );
 
     Ok(identity_client)
@@ -138,5 +139,6 @@ fn device_digest(device: &aziot_identity_common::AzureIoTSpec) -> String {
 
     let digest = sha2::Sha256::digest(json.as_bytes());
 
-    base64::encode(digest)
+    let engine = base64::engine::general_purpose::STANDARD;
+    base64::Engine::encode(&engine, digest)
 }

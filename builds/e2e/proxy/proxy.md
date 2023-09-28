@@ -41,6 +41,11 @@ az account set -s "$subscription_name"
 # If the resource group doesn't already exist, create it
 az group create -l "$location" -n "$resource_group_name"
 
+# If the 'Microsoft.ContainerInstance' resource provider isn't already registered for your subscription, register it
+az provider register -n Microsoft.ContainerInstance --subscription "$subscription_name"
+# Before continuing to the next step, issue the following command to see if registration has completed
+az provider show -n Microsoft.ContainerInstance -o tsv --query registrationState
+
 # Deploy the VMs
 az deployment group create --resource-group "$resource_group_name" --name 'e2e-proxy' --template-file ./proxy-deployment-template.json --parameters "$(
     jq -n \
@@ -70,7 +75,7 @@ chmod 600 ~/.ssh/id_rsa.runner
 ssh -i ~/.ssh/id_rsa.runner azureuser@<ip addr>
 ```
 
-To install and configure Azure Pipelines agent, see [Self-hosted Linux Agents](https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/v2-linux?view=azure-devops) and [Run a self-hosted agent behind a web proxy](https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/proxy?view=azure-devops&tabs=unix).
+To install and configure Azure Pipelines agent, see [Self-hosted Linux Agents](https://docs.microsoft.com/azure/devops/pipelines/agents/v2-linux) and [Run a self-hosted agent behind a web proxy](https://docs.microsoft.com/azure/devops/pipelines/agents/proxy?tabs=unix).
 
 > Note that the proxy URL required for most operations on the runner VMs is simply the hostname of the proxy server VM, e.g. `http://e2e-piaj2z37enpb4-proxy-vm:3128`. However, operations inside Docker containers on the runner VMs need either:
 > - The _fully-qualified_ name of the proxy VM, e.g. `http://e2e-piaj2z37enpb4-proxy-vm.e0gkjhpfr5quzatbjwfoss05vh.xx.internal.cloudapp.net:3128`, or

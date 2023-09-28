@@ -4,7 +4,7 @@ pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
     pid: libc::pid_t,
     module: String,
 }
@@ -36,7 +36,7 @@ where
             .decode_utf8()
             .ok()?;
 
-        let pid = match extensions.get::<Option<libc::pid_t>>().cloned().flatten() {
+        let pid = match extensions.get::<Option<libc::pid_t>>().copied().flatten() {
             Some(pid) => pid,
             None => return None,
         };
@@ -71,7 +71,10 @@ where
 
         let module = body
             .to_runtime_spec::<M>()
-            .map_err(edgelet_http::error::server_error)?;
+            .map_err(|err| http_common::server::Error {
+                status_code: http::StatusCode::BAD_REQUEST,
+                message: err.into(),
+            })?;
 
         super::pull_image(&*runtime, &module).await?;
 

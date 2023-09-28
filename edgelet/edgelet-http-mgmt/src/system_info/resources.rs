@@ -4,7 +4,7 @@ pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
 }
 
 const PATH: &str = "/systeminfo/resources";
@@ -45,7 +45,7 @@ where
                 hyper::StatusCode::OK,
                 &resources,
             )),
-            Err(err) => Err(edgelet_http::error::server_error(err.to_string())),
+            Err(err) => Err(edgelet_http::error::server_error(err)),
         }
     }
 

@@ -7,6 +7,7 @@ use futures_util::{
     pin_mut,
 };
 use log::{error, info, warn};
+use sha2::Digest;
 use tokio::{sync::Notify, task::JoinHandle, time};
 
 use crate::utils::file;
@@ -149,7 +150,7 @@ impl CertificateMonitor {
         let server_cert_expiration_date = None;
 
         let work_load_api_client =
-            edgelet_client::workload(&workload_url).context("Could not get workload client")?;
+            edgelet_client::workload(workload_url).context("Could not get workload client")?;
 
         Ok(CertificateMonitor {
             module_id,
@@ -199,7 +200,10 @@ impl CertificateMonitor {
 
         let trust_bundle = resp.certificate().to_string();
 
-        let bundle_of_trust_hash = format!("{:x}", md5::compute(&trust_bundle));
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&trust_bundle);
+        let bundle_of_trust_hash = hasher.finalize();
+        let bundle_of_trust_hash = format!("{:x}", bundle_of_trust_hash);
 
         if self.bundle_of_trust_hash.ne(&bundle_of_trust_hash) {
             self.bundle_of_trust_hash = bundle_of_trust_hash;
@@ -220,7 +224,7 @@ fn unwrap_certificate_response(
         None => return Err(anyhow::anyhow!("Private key field is empty")),
     };
 
-    let datetime = DateTime::parse_from_rfc3339(&resp.expiration())
+    let datetime = DateTime::parse_from_rfc3339(resp.expiration())
         .context("Error parsing certificate expiration date")?;
     // convert the string into DateTime<Utc> or other timezone
     let expiration_date = datetime.with_timezone(&Utc);
@@ -229,6 +233,7 @@ fn unwrap_certificate_response(
 }
 
 #[cfg(test)]
+#[allow(clippy::semicolon_if_nothing_returned)]
 mod tests {
     use super::*;
     use mockito::mock;

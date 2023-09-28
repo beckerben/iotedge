@@ -24,7 +24,7 @@ impl State {
         ),
         super::Error,
     > {
-        use futures_core::Stream;
+        use futures_util::Stream;
 
         let mut subscription_updates = vec![];
 
@@ -435,6 +435,7 @@ impl State {
             }
         } else {
             // Re-create all pending (ie unacked) changes to the set of subscriptions
+            #[allow(clippy::needless_collect)]
             let unacked_packets: Vec<_> = self
                 .subscription_updates_waiting_to_be_acked
                 .iter()

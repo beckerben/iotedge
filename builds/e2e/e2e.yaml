@@ -3,22 +3,16 @@ pr: none
 
 resources:
   pipelines:
-  - pipeline: images
-    source: 'Azure-IoT-Edge-Core Build Images'
-    branch: 'master'
+  - pipeline: ci-build
+    source: 'Azure-IoT-Edge-Core CI Build'
+    branch: 'main'
     trigger:
       branches:
-      - master
-      - release/*
-  - pipeline: packages
-    source: 'Azure-IoT-Edge-Core Edgelet Packages'
-    branch: 'master'
-    trigger:
-      branches:
-      - master
+      - main
       - release/*
 
 variables:
+  DisableDockerDetector: true
   # A 'minimal' pipeline only runs one end-to-end test (TempSensor). This is useful for platforms or
   # environments that are very similar to other platforms/environments in our matrix, Ubuntu 18.04
   # with the 'docker-ce' package vs. Ubuntu 18.04 with the 'iotedge-moby' package vs. the same
@@ -28,24 +22,23 @@ variables:
   # The 'minimal' variable defaults to 'false'; we override it in specific jobs as needed.
   minimal: false
   verbose: false
-  NugetSecurityAnalysisWarningLevel: warn
 
 jobs:
 
 ################################################################################
-  - job: linux_arm32v7
+  - job: debian_11_arm32v7
 ################################################################################
-    displayName: Linux arm32v7
+    displayName: Debian 11 arm32v7
 
     pool:
       name: $(pool.custom.name)
-      demands: rpi3-e2e-tests
+      demands: deb11-e2e-tests
 
     variables:
       os: linux
       arch: arm32v7
-      artifactName: iotedged-debian9-arm32v7
-      identityServiceArtifactName: packages_debian-9-slim_arm32v7
+      artifactName: iotedged-debian11-arm32v7
+      identityServiceArtifactName: packages_debian-11-slim_arm32v7
       identityServicePackageFilter: aziot-identity-service_*_armhf.deb
 
     timeoutInMinutes: 120
@@ -56,42 +49,40 @@ jobs:
     - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
 
-# Using 1ES-hosted agents in master branch causes test failures; disabling
-# until fixed.
-# ################################################################################
-#   - job: ubuntu_1804_msmoby
-# ################################################################################
-#     displayName: Ubuntu 18.04 with iotedge-moby
-
-#     pool:
-#       name: $(pool.linux.name)
-#       demands:
-#       - ImageOverride -equals agent-aziotedge-ubuntu-18.04-msmoby
-
-#     variables:
-#       os: linux
-#       arch: amd64
-#       artifactName: iotedged-ubuntu18.04-amd64
-#       identityServiceArtifactName: packages_ubuntu-18.04_amd64
-#       identityServicePackageFilter: aziot-identity-service_*_amd64.deb
-
-#     steps:
-#     - template: templates/e2e-setup.yaml
-#     - template: templates/e2e-run.yaml
-
 ################################################################################
-  - job: ubuntu_1804_docker
+  - job: debian_10_arm32v7
 ################################################################################
-    # displayName: Ubuntu 18.04 with Docker (minimal)
-    displayName: Ubuntu 18.04 with Docker
+    displayName: Debian 10 arm32v7 (minimal)
 
     pool:
-      vmImage: ubuntu-18.04
-      # Using 1ES-hosted agents in master branch causes test failures; disabling
-      # until fixed.
-      # name: $(pool.linux.name)
-      # demands:
-      # - ImageOverride -equals agent-aziotedge-ubuntu-18.04-docker
+      name: $(pool.custom.name)
+      demands: deb10-e2e-tests
+
+    variables:
+      os: linux
+      arch: arm32v7
+      artifactName: iotedged-debian10-arm32v7
+      identityServiceArtifactName: packages_debian-10-slim_arm32v7
+      identityServicePackageFilter: aziot-identity-service_*_armhf.deb
+      minimal: true
+
+    timeoutInMinutes: 120
+
+    steps:
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_1804_msmoby
+################################################################################
+    displayName: Ubuntu 18.04 with iotedge-moby
+
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-18.04-msmoby
 
     variables:
       os: linux
@@ -99,49 +90,45 @@ jobs:
       artifactName: iotedged-ubuntu18.04-amd64
       identityServiceArtifactName: packages_ubuntu-18.04_amd64
       identityServicePackageFilter: aziot-identity-service_*_amd64.deb
-      # When we switch to 1ES-hosted agents, we can make this a minimal pipeline
-      # minimal: true
+
+    timeoutInMinutes: 90
 
     steps:
     - template: templates/e2e-setup.yaml
     - template: templates/e2e-run.yaml
 
-# Using 1ES-hosted agents in master branch causes test failures; disabling
-# until fixed.
-# ################################################################################
-#   - job: ubuntu_2004_msmoby
-# ################################################################################
-#     displayName: Ubuntu 20.04 with iotedge-moby
-
-#     pool:
-#       name: $(pool.linux.name)
-#       demands:
-#       - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
-
-#     variables:
-#       os: linux
-#       arch: amd64
-#       artifactName: iotedged-ubuntu20.04-amd64
-#       identityServiceArtifactName: packages_ubuntu-20.04_amd64
-#       identityServicePackageFilter: aziot-identity-service_*_amd64.deb
-
-#     steps:
-#     - template: templates/e2e-setup.yaml
-#     - template: templates/e2e-run.yaml
-
 ################################################################################
-  - job: ubuntu_2004_docker
+  - job: ubuntu_1804_docker
 ################################################################################
-    # displayName: Ubuntu 20.04 with Docker (minimal)
-    displayName: Ubuntu 20.04 with Docker
+
+    displayName: Ubuntu 18.04 with Docker (minimal)
 
     pool:
-      vmImage: ubuntu-20.04
-      # Using 1ES-hosted agents in master branch causes test failures; disabling
-      # until fixed.
-      # name: $(pool.linux.name)
-      # demands:
-      # - ImageOverride -equals agent-aziotedge-ubuntu-20.04-docker
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-18.04-docker
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-ubuntu18.04-amd64
+      identityServiceArtifactName: packages_ubuntu-18.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      minimal: true
+
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_2004_msmoby
+################################################################################
+    displayName: Ubuntu 20.04 with iotedge-moby
+
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-20.04-msmoby
 
     variables:
       os: linux
@@ -149,11 +136,106 @@ jobs:
       artifactName: iotedged-ubuntu20.04-amd64
       identityServiceArtifactName: packages_ubuntu-20.04_amd64
       identityServicePackageFilter: aziot-identity-service_*_amd64.deb
-      # When we switch to 1ES-hosted agents, we can make this a minimal pipeline
-      # minimal: true
+
+    timeoutInMinutes: 90
 
     steps:
     - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_2004_docker
+################################################################################
+    displayName: Ubuntu 20.04 with Docker (minimal)
+
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-20.04-docker
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-ubuntu20.04-amd64
+      identityServiceArtifactName: packages_ubuntu-20.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      minimal: true
+
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_2004_arm64v8
+################################################################################
+    displayName: Ubuntu 20.04 on arm64v8
+    pool:
+      name: $(pool.linux.arm.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-20.04-arm64-docker
+
+    variables:
+      os: linux
+      arch: arm64v8
+      artifactName: iotedged-ubuntu20.04-aarch64
+      identityServiceArtifactName: packages_ubuntu-20.04_aarch64
+      identityServicePackageFilter: aziot-identity-service_*_arm64.deb
+
+    timeoutInMinutes: 120
+
+    steps:
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_2204
+################################################################################
+    displayName: Ubuntu 22.04 on amd64
+
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-ubuntu-22.04-msmoby
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-ubuntu22.04-amd64
+      identityServiceArtifactName: packages_ubuntu-22.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+
+    timeoutInMinutes: 90
+
+    steps:
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: ubuntu_2204_arm64v8
+################################################################################
+    displayName: Ubuntu 22.04 on arm64v8
+
+    pool:
+      name: $(pool.custom.name)
+      demands: ubu2204-arm64-e2e-tests
+
+    variables:
+      os: linux
+      arch: arm64v8
+      artifactName: iotedged-ubuntu22.04-aarch64
+      identityServiceArtifactName: packages_ubuntu-22.04_aarch64
+      identityServicePackageFilter: aziot-identity-service_*_arm64.deb
+
+    timeoutInMinutes: 90
+
+    steps:
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
 
 ################################################################################
@@ -162,17 +244,9 @@ jobs:
     displayName: CentOs7 amd64
 
     pool:
-      name: $(pool.custom.name)
+      name: $(pool.linux.name)
       demands:
-        - Agent.OS -equals Linux
-        - Agent.OSArchitecture -equals X64
-        - run-new-e2e-tests -equals true
-        - centos -equals 7
-      # Using 1ES-hosted agents in master branch causes test failures; disabling
-      # until fixed.
-      # name: $(pool.linux.name)
-      # demands:
-      # - ImageOverride -equals agent-aziotedge-centos-7-msmoby
+      - ImageOverride -equals agent-aziotedge-centos-7-msmoby
 
     variables:
       os: linux
@@ -187,34 +261,121 @@ jobs:
     - template: templates/e2e-clear-docker-cached-images.yaml
     - template: templates/e2e-run.yaml
 
-# Disabling until we fix proxy timeout issues
-# ################################################################################
-#   - job: linux_amd64_proxy
-# ################################################################################
-#     displayName: Linux amd64 behind a proxy
+  ################################################################################
+  - job: redhat8_amd64
+  ################################################################################
+    displayName: RedHat8 amd64
 
-#     pool:
-#       name: $(pool.custom.name)
-#       demands: new-e2e-proxy
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-rhel-8-msmoby
 
-#     variables:
-#       os: linux
-#       arch: amd64
-#       artifactName: iotedged-ubuntu18.04-amd64
-#       identityServiceArtifactName: packages_ubuntu-18.04_amd64
-#       identityServicePackageFilter: aziot-identity-service_*_amd64.deb
-#       # workaround, see https://github.com/Microsoft/azure-pipelines-agent/issues/2138#issuecomment-470166671
-#       'agent.disablelogplugin.testfilepublisherplugin': true
-#       'agent.disablelogplugin.testresultlogplugin': true
-#       # because we aren't publishing test artifacts for this job, turn on verbose logging instead
-#       verbose: true
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-redhat8-amd64
+      identityServiceArtifactName: packages_redhat-ubi8-latest_amd64
+      identityServicePackageFilter: aziot-identity-service-*.x86_64.rpm
 
-#     timeoutInMinutes: 120
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
 
-#     steps:
-#     - template: templates/e2e-clean-directory.yaml
-#     - template: templates/e2e-setup.yaml
-#     - template: templates/e2e-clear-docker-cached-images.yaml
-#     - template: templates/e2e-run.yaml
-#       parameters:
-#         test_type: http_proxy
+  ################################################################################
+  - job: redhat9_amd64
+  ################################################################################
+    displayName: RedHat9 amd64
+
+    pool:
+      name: $(pool.linux.name)
+      demands:
+      - ImageOverride -equals agent-aziotedge-rhel-9-msmoby
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-redhat9-amd64
+      identityServiceArtifactName: packages_redhat-ubi9-latest_amd64
+      identityServicePackageFilter: aziot-identity-service-*.x86_64.rpm
+
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: linux_amd64_proxy
+################################################################################
+    displayName: Linux amd64 behind a proxy
+
+    pool:
+      name: $(pool.custom.name)
+      demands: new-e2e-proxy
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-ubuntu18.04-amd64
+      identityServiceArtifactName: packages_ubuntu-18.04_amd64
+      identityServicePackageFilter: aziot-identity-service_*_amd64.deb
+      # workaround, see https://github.com/Microsoft/azure-pipelines-agent/issues/2138#issuecomment-470166671
+      'agent.disablelogplugin.testfilepublisherplugin': true
+      'agent.disablelogplugin.testresultlogplugin': true
+      # because we aren't publishing test artifacts for this job, turn on verbose logging instead
+      verbose: true
+      # skip component governance detection to avoid proxy issues. It is checked in the other jobs.
+      skipComponentGovernanceDetection: true
+
+    timeoutInMinutes: 120
+
+    steps:
+    - template: templates/e2e-clean-directory.yaml
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-clear-docker-cached-images.yaml
+    - template: templates/e2e-run.yaml
+      parameters:
+        test_type: http_proxy
+
+################################################################################
+  - job: mariner2_amd64
+################################################################################
+    displayName: Mariner 2.0 amd64
+    condition: eq(variables['run.EFLOW.amd64'], true)
+    pool:
+      name: $(pool.linux.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-mariner-2.0-msmoby
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-mariner2-amd64
+      identityServiceArtifactName: packages_mariner-2_amd64
+      identityServicePackageFilter: aziot-identity-service-*.cm2.x86_64.rpm
+
+    timeoutInMinutes: 90
+
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml
+
+################################################################################
+  - job: mariner2_arm64
+################################################################################
+    displayName: Mariner 2.0 arm64
+    condition: eq(variables['run.EFLOW.arm64'], true)
+    pool:
+      name: $(pool.linux.arm.name)
+      demands:
+        - ImageOverride -equals agent-aziotedge-mariner-2.0-arm64-msmoby
+
+    variables:
+      os: linux
+      arch: amd64
+      artifactName: iotedged-mariner2-aarch64
+
+    timeoutInMinutes: 90
+
+    steps:
+    - template: templates/e2e-setup.yaml
+    - template: templates/e2e-run.yaml

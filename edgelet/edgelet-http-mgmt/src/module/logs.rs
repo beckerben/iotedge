@@ -4,7 +4,7 @@ pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
     module: String,
 
     follow: Option<String>,
@@ -69,7 +69,7 @@ where
             runtime
                 .logs(&self.module, &log_options)
                 .await
-                .map_err(|err| edgelet_http::error::server_error(err.to_string()))?
+                .map_err(|err| edgelet_http::error::runtime_error(&*runtime, &err))?
         };
 
         let res = http_common::server::response::chunked(hyper::StatusCode::OK, logs, "text/plain");

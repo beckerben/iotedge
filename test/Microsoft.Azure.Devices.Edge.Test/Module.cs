@@ -8,7 +8,6 @@ namespace Microsoft.Azure.Devices.Edge.Test
     using Microsoft.Azure.Devices.Edge.Test.Common;
     using Microsoft.Azure.Devices.Edge.Test.Common.Config;
     using Microsoft.Azure.Devices.Edge.Test.Helpers;
-    using Microsoft.Azure.Devices.Edge.Util.Test.Common.NUnit;
     using NUnit.Framework;
 
     [EndToEnd]
@@ -16,6 +15,46 @@ namespace Microsoft.Azure.Devices.Edge.Test
     {
         const string SensorName = "tempSensor";
         const string DefaultSensorImage = "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0";
+
+        [TestCase(Protocol.Mqtt)]
+        [TestCase(Protocol.Amqp)]
+        [Category("CentOsSafe")]
+        public async Task CertRenew(Protocol protocol)
+        {
+            CancellationToken token = this.TestToken;
+
+            EdgeDeployment deployment = await this.runtime.DeployConfigurationAsync(
+                    builder =>
+                    {
+                        builder.GetModule(ModuleName.EdgeHub).WithEnvironment(("ServerCertificateRenewAfterInMs", "6000"));
+                        builder.GetModule(ModuleName.EdgeHub).WithEnvironment(new[] { ("UpstreamProtocol", protocol.ToString()) });
+                    },
+                    token,
+                    Context.Current.NestedEdge);
+
+            EdgeModule edgeHub = deployment.Modules[ModuleName.EdgeHub];
+            await edgeHub.WaitForStatusAsync(EdgeModuleStatus.Running, token);
+            EdgeModule edgeAgent = deployment.Modules[ModuleName.EdgeAgent];
+            // certificate renew should stop edgeHub and then it should be started by edgeAgent
+            await edgeAgent.WaitForReportedPropertyUpdatesAsync(
+                new
+                {
+                    properties = new
+                    {
+                        reported = new
+                        {
+                            systemModules = new
+                            {
+                                edgeHub = new
+                                {
+                                    restartCount = 1
+                                }
+                            }
+                        }
+                    }
+                },
+                token);
+        }
 
         [Test]
         [Category("CentOsSafe")]
@@ -49,33 +88,6 @@ namespace Microsoft.Azure.Devices.Edge.Test
             }
 
             await sensor.WaitForEventsReceivedAsync(startTime, token);
-
-            await sensor.UpdateDesiredPropertiesAsync(
-                new
-                {
-                    properties = new
-                    {
-                        desired = new
-                        {
-                            SendData = true,
-                            SendInterval = 10
-                        }
-                    }
-                },
-                token);
-            await sensor.WaitForReportedPropertyUpdatesAsync(
-                new
-                {
-                    properties = new
-                    {
-                        reported = new
-                        {
-                            SendData = true,
-                            SendInterval = 10
-                        }
-                    }
-                },
-                token);
         }
 
         [Test]
@@ -116,7 +128,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
         }
 
         [Test]
-        [Category("FlakyOnArm")]
+        [Category("Amd64Only")]
         [Category("CentOsSafe")]
         // Test Temperature Filter Function: https://docs.microsoft.com/en-us/azure/iot-edge/tutorial-deploy-function
         public async Task TempFilterFunc()

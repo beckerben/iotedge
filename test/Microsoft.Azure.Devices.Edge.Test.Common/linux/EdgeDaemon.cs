@@ -51,15 +51,28 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Linux
                     version = "stretch";
                     packageExtension = SupportedPackageExtension.Deb;
                     break;
+                case "rhel":
+                    version = version.Split('.')[0];
+                    packageExtension = SupportedPackageExtension.Rpm;
+
+                    if (version != "8" && version != "9")
+                    {
+                        throw new NotImplementedException($"Daemon is only installed on Red Hat version 8.X, operating system '{os} {version}'");
+                    }
+
+                    break;
                 case "centos":
                     version = version.Split('.')[0];
                     packageExtension = SupportedPackageExtension.Rpm;
 
                     if (version != "7")
                     {
-                        throw new NotImplementedException($"Don't know how to install daemon on operating system '{os} {version}'");
+                        throw new NotImplementedException($"Daemon is only installed on Centos version 7.X, operating system '{os} {version}'");
                     }
 
+                    break;
+                case "mariner":
+                    packageExtension = SupportedPackageExtension.Rpm;
                     break;
                 default:
                     throw new NotImplementedException($"Don't know how to install daemon on operating system '{os}'");
@@ -139,37 +152,32 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common.Linux
         {
             await Process.RunAsync("systemctl", "start aziot-keyd aziot-certd aziot-identityd aziot-edged", token);
             await WaitForStatusAsync(ServiceControllerStatus.Running, token);
+            await Task.Delay(10000);
 
-            // Waiting for the processes to enter the "Running" state doesn't guarantee that
-            // they are fully started and ready to accept requests. Therefore, this function
-            // must wait until a request can be processed.
-            while (true)
-            {
-                var processInfo = new System.Diagnostics.ProcessStartInfo
+            await Retry.Do(
+                async () =>
                 {
-                    FileName = "iotedge",
-                    Arguments = "list",
-                    RedirectStandardOutput = true
-                };
-                var request = System.Diagnostics.Process.Start(processInfo);
+                    string[] output = await Process.RunAsync("iotedge", "list", token);
+                    return output;
+                },
+                output => true,
+                e =>
+                {
+                    Log.Warning($"Failed to list iotedge modules.\nException: {e.ToString()}");
 
-                if (request.WaitForExit(1000))
-                {
-                    if (request.ExitCode == 0)
-                    {
-                        request.Close();
-                        Log.Verbose("aziot-edged ready for requests");
-                        break;
-                    }
-                }
-                else
-                {
-                    request.Kill(true);
-                    request.WaitForExit();
-                    request.Close();
-                    Log.Verbose("aziot-edged not yet ready");
-                }
-            }
+                    // Retry if iotedged's management endpoint is still starting up,
+                    // and therefore isn't responding to `iotedge list` yet
+                    static bool DaemonNotReady(string details) =>
+                        details.Contains("Incorrect function", StringComparison.OrdinalIgnoreCase) ||
+                        details.Contains("Could not list modules", StringComparison.OrdinalIgnoreCase) ||
+                        details.Contains("Operation not permitted", StringComparison.OrdinalIgnoreCase) ||
+                        details.Contains("Socket file could not be found", StringComparison.OrdinalIgnoreCase) ||
+                        details.Contains("Object reference not set to an instance of an object", StringComparison.OrdinalIgnoreCase);
+
+                    return DaemonNotReady(e.ToString());
+                },
+                TimeSpan.FromSeconds(5),
+                token);
         }
 
         public Task StopAsync(CancellationToken token) => Profiler.Run(

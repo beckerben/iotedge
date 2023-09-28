@@ -15,7 +15,6 @@ namespace Microsoft.Azure.Devices.Edge.Test
     using Microsoft.Azure.Devices.Edge.Test.Common;
     using Microsoft.Azure.Devices.Edge.Test.Common.Config;
     using Microsoft.Azure.Devices.Edge.Test.Helpers;
-    using Microsoft.Azure.Devices.Edge.Util.Test.Common.NUnit;
     using Newtonsoft.Json;
     using Newtonsoft.Json.Linq;
     using NUnit.Framework;
@@ -33,7 +32,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
         const string DefaultLoadGenTestStartDelay = "00:00:20";
 
         [Test]
-        [Category("FlakyOnArm")]
+        [Category("Flaky")]
         public async Task PriorityQueueModuleToModuleMessages()
         {
             CancellationToken token = this.TestToken;
@@ -44,14 +43,14 @@ namespace Microsoft.Azure.Devices.Edge.Test
             TestInfo testInfo = this.InitTestInfo(5, 1000, true);
 
             Action<EdgeConfigBuilder> addLoadGenConfig = this.BuildAddLoadGenConfig(trackingId, loadGenImage, testInfo, false);
-            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, RelayerModuleName);
+            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, RelayerModuleName, false);
 
             EdgeDeployment deployment = await this.runtime.DeployConfigurationAsync(addLoadGenConfig + addTrcConfig, token, Context.Current.NestedEdge);
             PriorityQueueTestStatus loadGenTestStatus = await this.PollUntilFinishedAsync(LoadGenModuleName, token);
             Action<EdgeConfigBuilder> addRelayerConfig = this.BuildAddRelayerConfig(relayerImage, loadGenTestStatus);
             deployment = await this.runtime.DeployConfigurationAsync(addLoadGenConfig + addTrcConfig + addRelayerConfig, token, Context.Current.NestedEdge);
             await this.PollUntilFinishedAsync(RelayerModuleName, token);
-            await TestResultCoordinatorUtil.ValidateResultsAsync();
+            Assert.True(await TestResultCoordinatorUtil.IsResultValidAsync());
         }
 
         [Test]
@@ -69,7 +68,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
             var testResultReportingClient = new TestResultReportingClient { BaseUrl = "http://localhost:5001" };
 
             Action<EdgeConfigBuilder> addLoadGenConfig = this.BuildAddLoadGenConfig(trackingId, loadGenImage, testInfo, true);
-            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, "hubtest");
+            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, "hubtest", false);
             Action<EdgeConfigBuilder> addNetworkControllerConfig = TestResultCoordinatorUtil.BuildAddNetworkControllerConfig(trackingId, networkControllerImage);
 
             EdgeDeployment deployment = await this.runtime.DeployConfigurationAsync(addLoadGenConfig + addTrcConfig + addNetworkControllerConfig, token, Context.Current.NestedEdge);
@@ -85,11 +84,11 @@ namespace Microsoft.Azure.Devices.Edge.Test
                 await testResultReportingClient.ReportResultAsync(messageTestResult.ToTestOperationResultDto());
             }
 
-            await TestResultCoordinatorUtil.ValidateResultsAsync();
+            Assert.True(await TestResultCoordinatorUtil.IsResultValidAsync());
         }
 
         [Test]
-        [Category("FlakyOnArm")]
+        [Category("Flaky")]
         public async Task PriorityQueueTimeToLive()
         {
             CancellationToken token = this.TestToken;
@@ -100,7 +99,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
             TestInfo testInfo = this.InitTestInfo(5, 20);
 
             Action<EdgeConfigBuilder> addLoadGenConfig = this.BuildAddLoadGenConfig(trackingId, loadGenImage, testInfo, false);
-            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, RelayerModuleName);
+            Action<EdgeConfigBuilder> addTrcConfig = TestResultCoordinatorUtil.BuildAddTestResultCoordinatorConfig(trackingId, trcImage, LoadGenModuleName, RelayerModuleName, false);
 
             EdgeDeployment deployment = await this.runtime.DeployConfigurationAsync(addLoadGenConfig + addTrcConfig, token, Context.Current.NestedEdge);
             PriorityQueueTestStatus loadGenTestStatus = await this.PollUntilFinishedAsync(LoadGenModuleName, token);
@@ -112,7 +111,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
             Action<EdgeConfigBuilder> addRelayerConfig = this.BuildAddRelayerConfig(relayerImage, loadGenTestStatus);
             deployment = await this.runtime.DeployConfigurationAsync(addLoadGenConfig + addTrcConfig + addRelayerConfig, token, Context.Current.NestedEdge);
             await this.PollUntilFinishedAsync(RelayerModuleName, token);
-            await TestResultCoordinatorUtil.ValidateResultsAsync();
+            Assert.True(await TestResultCoordinatorUtil.IsResultValidAsync());
         }
 
         async Task ReceiveEventsFromIotHub(DateTime startTime, ConcurrentQueue<MessageTestResult> messages, PriorityQueueTestStatus loadGenTestStatus, string trackingId, CancellationToken token)
@@ -310,7 +309,7 @@ namespace Microsoft.Azure.Devices.Edge.Test
             do
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
-                var result = await this.IotHub.InvokeMethodAsync(this.runtime.DeviceId, moduleName, new CloudToDeviceMethod("IsFinished", TimeSpan.FromSeconds(300), TimeSpan.FromSeconds(300)), token);
+                var result = await this.IotHub.InvokeMethodAsync(this.runtime.DeviceId, moduleName, new CloudToDeviceMethod("IsFinished", TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(60)), token);
                 Assert.AreEqual(result.Status, (int)HttpStatusCode.OK);
                 testStatus = JsonConvert.DeserializeObject<PriorityQueueTestStatus>(result.GetPayloadAsJson());
             }

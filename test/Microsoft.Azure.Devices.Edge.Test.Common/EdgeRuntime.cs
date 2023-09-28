@@ -3,11 +3,14 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Test.Common.Config;
     using Microsoft.Azure.Devices.Edge.Util;
+    using Newtonsoft.Json;
 
     public class EdgeRuntime
     {
@@ -61,9 +64,16 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
                 .WithProxy(this.proxy);
 
             addConfig(builder);
-
             DateTime deployTime = DateTime.Now;
             EdgeConfiguration edgeConfiguration = builder.Build();
+            string signedConfig = string.Empty;
+
+            if (!string.IsNullOrEmpty(signedConfig))
+            {
+                // Convert signed config to ConfigurationContent
+                edgeConfiguration.Config = JsonConvert.DeserializeObject<ConfigurationContent>(signedConfig);
+            }
+
             await edgeConfiguration.DeployAsync(this.iotHub, token);
             EdgeModule[] modules = edgeConfiguration.ModuleNames
                 .Select(id => new EdgeModule(id, this.DeviceId, this.iotHub))

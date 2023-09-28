@@ -8,7 +8,7 @@ where
     module_uri: String,
     pid: libc::pid_t,
     api: super::CertApi,
-    runtime: std::sync::Arc<futures_util::lock::Mutex<M>>,
+    runtime: std::sync::Arc<tokio::sync::Mutex<M>>,
 }
 
 #[async_trait::async_trait]
@@ -42,13 +42,12 @@ where
             service.config.hub_name, service.config.device_id, module_id
         );
 
-        let pid = match extensions.get::<Option<libc::pid_t>>().cloned().flatten() {
+        let pid = match extensions.get::<Option<libc::pid_t>>().copied().flatten() {
             Some(pid) => pid,
             None => return None,
         };
 
         let api = super::CertApi::new(
-            service.key_connector.clone(),
             service.key_client.clone(),
             service.cert_client.clone(),
             &service.config,
@@ -71,8 +70,7 @@ where
 
         let cert_id = format!("aziot-edged/module/{}:identity", &self.module_id);
 
-        let module_uri = super::sanitize_dns_name(self.module_uri);
-        let subject_alt_names = vec![super::SubjectAltName::Dns(module_uri)];
+        let subject_alt_names = vec![super::SubjectAltName::Dns(self.module_uri)];
 
         let csr_extensions = identity_cert_extensions().map_err(|_| {
             edgelet_http::error::server_error("failed to set identity csr extensions")

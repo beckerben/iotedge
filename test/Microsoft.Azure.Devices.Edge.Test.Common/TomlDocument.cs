@@ -77,7 +77,7 @@ namespace Microsoft.Azure.Devices.Edge.Test.Common
             return this.document.ToString();
         }
 
-        void AddTable<T>(string tableName, string key, T value)
+        public void AddTable<T>(string tableName, string key, T value)
         {
             string v = value is string ? $"\"{value}\"" : value.ToString().ToLower();
 

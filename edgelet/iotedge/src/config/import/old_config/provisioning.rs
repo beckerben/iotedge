@@ -3,7 +3,7 @@
 use regex::Regex;
 use url::Url;
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) struct Provisioning {
     #[serde(flatten)]
@@ -13,7 +13,7 @@ pub(crate) struct Provisioning {
     pub(crate) dynamic_reprovisioning: bool,
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase", tag = "source")]
 pub(crate) enum ProvisioningType {
     Manual(Manual),
@@ -31,7 +31,7 @@ impl<'de> serde::Deserialize<'de> for Manual {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Debug, serde_derive::Deserialize)]
+        #[derive(Debug, serde::Deserialize)]
         struct Inner {
             #[serde(skip_serializing_if = "Option::is_none")]
             device_connection_string: Option<String>,
@@ -63,7 +63,7 @@ impl<'de> serde::Deserialize<'de> for Manual {
         Ok(Manual { authentication })
     }
 }
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase", tag = "method")]
 pub(crate) enum ManualAuthMethod {
     #[serde(rename = "device_connection_string")]
@@ -114,11 +114,17 @@ impl std::str::FromStr for ManualDeviceConnectionString {
         let mut shared_access_key = None;
 
         for sections in s.split(';') {
-            let mut parts = sections.split('=');
-            match parts.next() {
-                Some(DEVICEID_KEY) => device_id = parts.next().map(String::from),
-                Some(HOSTNAME_KEY) => hostname = parts.next().map(String::from),
-                Some(SHAREDACCESSKEY_KEY) => shared_access_key = parts.next().map(String::from),
+            let (key, value) = if let Some(parts) = sections.split_once('=') {
+                (parts.0, Some(parts.1.to_string()))
+            } else {
+                // Ignore extraneous component in the connection string
+                continue;
+            };
+
+            match key {
+                DEVICEID_KEY => device_id = value,
+                HOSTNAME_KEY => hostname = value,
+                SHAREDACCESSKEY_KEY => shared_access_key = value,
                 _ => (), // Ignore extraneous component in the connection string
             }
         }
@@ -128,7 +134,8 @@ impl std::str::FromStr for ManualDeviceConnectionString {
         if shared_access_key.is_empty() {
             return Err(missing_parameter(SHAREDACCESSKEY_KEY));
         }
-        let shared_access_key = base64::decode(&shared_access_key)
+        let engine = base64::engine::general_purpose::STANDARD;
+        let shared_access_key = base64::Engine::decode(&engine, &shared_access_key)
             .map_err(|err| malformed_parameter(SHAREDACCESSKEY_KEY, err))?;
 
         let device_id = device_id.ok_or_else(|| missing_parameter(DEVICEID_KEY))?;
@@ -154,7 +161,7 @@ impl<'de> serde::Deserialize<'de> for ManualDeviceConnectionString {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Debug, serde_derive::Deserialize)]
+        #[derive(Debug, serde::Deserialize)]
         #[serde(rename_all = "lowercase")]
         struct Inner {
             device_connection_string: String,
@@ -170,7 +177,7 @@ impl<'de> serde::Deserialize<'de> for ManualDeviceConnectionString {
     }
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) struct ManualX509Auth {
     pub(crate) iothub_hostname: String,
@@ -192,7 +199,7 @@ impl<'de> serde::Deserialize<'de> for Dps {
     where
         D: serde::Deserializer<'de>,
     {
-        #[derive(Debug, serde_derive::Deserialize)]
+        #[derive(Debug, serde::Deserialize)]
         struct Inner {
             global_endpoint: Url,
             scope_id: String,
@@ -230,7 +237,7 @@ impl<'de> serde::Deserialize<'de> for Dps {
     }
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase", tag = "method")]
 pub(crate) enum AttestationMethod {
     Tpm(TpmAttestationInfo),
@@ -241,13 +248,13 @@ pub(crate) enum AttestationMethod {
     X509(X509AttestationInfo),
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) struct TpmAttestationInfo {
     pub(crate) registration_id: String,
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) struct SymmetricKeyAttestationInfo {
     pub(crate) registration_id: String,
@@ -255,7 +262,7 @@ pub(crate) struct SymmetricKeyAttestationInfo {
     pub(crate) symmetric_key: Vec<u8>,
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) struct X509AttestationInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -266,8 +273,9 @@ pub(crate) struct X509AttestationInfo {
     pub(crate) identity_pk: Url,
 }
 
-#[derive(Debug, serde_derive::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[allow(dead_code)]
 pub(crate) struct External {
     endpoint: Url,
 }
@@ -289,7 +297,8 @@ where
         where
             E: serde::de::Error,
         {
-            base64::decode_config(v, base64::STANDARD).map_err(serde::de::Error::custom)
+            let engine = base64::engine::general_purpose::STANDARD;
+            base64::Engine::decode(&engine, v).map_err(serde::de::Error::custom)
         }
     }
 

@@ -1,5 +1,6 @@
 auto_reprovisioning_mode = "OnErrorOnly"
 hostname = "my-device"
+prefer_module_identity_cache = false
 
 [provisioning]
 source = "dps"
@@ -20,6 +21,8 @@ value = "YXppb3QtaWRlbnRpdHktc2VydmljZXxhemlvdC1pZGVudGl0eS1zZXJ2aWNlfGF6aW90LWl
 [cert_issuance]
 
 [preloaded_certs]
+
+[tpm]
 
 [agent]
 name = "edgeAgent"

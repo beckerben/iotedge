@@ -1,14 +1,13 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 use std::io::{copy, stdout};
-use std::path::PathBuf;
 
-use failure::Fail;
+use anyhow::Context;
 
 use edgelet_core::{LogOptions, ModuleRuntime};
 use support_bundle::{make_bundle, OutputLocation};
 
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 
 pub struct SupportBundleCommand<M> {
     runtime: M,
@@ -41,7 +40,7 @@ where
         }
     }
 
-    pub async fn execute(self) -> Result<(), Error> {
+    pub async fn execute(self) -> anyhow::Result<()> {
         println!("Making support bundle");
 
         let output_location = self.output_location.clone();
@@ -54,21 +53,19 @@ where
             &self.runtime,
         )
         .await
-        .map_err(|_| Error::from(ErrorKind::SupportBundle))?;
+        .context(Error::SupportBundle)?;
 
         match output_location {
             OutputLocation::File(location) => {
-                let path = PathBuf::from(location);
                 println!(
                     "Created support bundle at {}",
-                    path.canonicalize().unwrap_or(path).display()
+                    location.canonicalize().unwrap_or(location).display()
                 );
 
                 Ok(())
             }
             OutputLocation::Memory => {
-                copy(&mut bundle, &mut stdout())
-                    .map_err(|err| Error::from(err.context(ErrorKind::SupportBundle)))?;
+                copy(&mut bundle, &mut stdout()).context(Error::SupportBundle)?;
 
                 Ok(())
             }

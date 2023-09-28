@@ -4,13 +4,13 @@
 use aziot_cert_client_async::Client as CertClient;
 
 #[cfg(test)]
-use edgelet_test_utils::clients::CertClient;
+use test_common::client::CertClient;
 
 pub(crate) struct Route<M>
 where
     M: edgelet_core::ModuleRuntime + Send + Sync,
 {
-    client: std::sync::Arc<futures_util::lock::Mutex<CertClient>>,
+    client: std::sync::Arc<tokio::sync::Mutex<CertClient>>,
     trust_bundle: String,
     optional: bool,
     _runtime: std::marker::PhantomData<M>,
@@ -62,9 +62,14 @@ where
     async fn get(self) -> http_common::server::RouteResponse {
         let client = self.client.lock().await;
 
-        let certificate = client.get_cert(&self.trust_bundle).await.map_err(|_| {
-            edgelet_http::error::not_found(format!("certificate {} not found", self.trust_bundle))
-        });
+        let certificate =
+            client
+                .get_cert(&self.trust_bundle)
+                .await
+                .map_err(|_| http_common::server::Error {
+                    status_code: http::StatusCode::NOT_FOUND,
+                    message: format!("certificate {:?} not found", self.trust_bundle).into(),
+                });
 
         let certificate = match (certificate, self.optional) {
             (Ok(certificate), _) => std::str::from_utf8(&certificate)
@@ -144,8 +149,7 @@ mod tests {
 
             {
                 let mut client = route.client.lock().await;
-                client.certs =
-                    futures_util::lock::Mutex::new(std::cell::RefCell::new(certs.clone()));
+                client.certs = tokio::sync::Mutex::new(std::cell::RefCell::new(certs.clone()));
             }
 
             let response = route.get().await.unwrap();

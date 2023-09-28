@@ -34,8 +34,8 @@ impl TokenClient {
         let audience = format!(
             "{}/devices/{}/modules/{}",
             self.iothub_hostname,
-            percent_encode(self.device_id.as_bytes(), IOTHUB_ENCODE_SET).to_string(),
-            percent_encode(self.module_id.as_bytes(), IOTHUB_ENCODE_SET).to_string()
+            percent_encode(self.device_id.as_bytes(), IOTHUB_ENCODE_SET),
+            percent_encode(self.module_id.as_bytes(), IOTHUB_ENCODE_SET)
         );
 
         let resource_uri =
@@ -50,8 +50,8 @@ impl TokenClient {
 
         let signature = resp.digest();
         let token = UrlSerializer::new(format!("SharedAccessSignature sr={}", resource_uri))
-            .append_pair("sig", &signature)
-            .append_pair("se", &expiration_date)
+            .append_pair("sig", signature)
+            .append_pair("se", expiration_date)
             .finish();
 
         info!("Successfully generated new token");
